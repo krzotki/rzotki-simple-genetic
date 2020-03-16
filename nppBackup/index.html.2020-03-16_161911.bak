@@ -1,0 +1,457 @@
+<html>
+	<head>
+		<meta charset="utf-8"/>
+		<style>
+			body
+			{
+				background:#303030;
+				color:white;
+			}
+			canvas
+			{
+				
+				position:absolute;
+				border:solid white 1px;
+				margin:0;
+				padding:0;
+			}
+			#stats
+			{
+				position:absolute;
+				border:solid white 1px;
+				width:200px;
+				height:250px;
+				left:1020px;
+				padding:20px;
+				text-align:center;
+			}
+		
+		</style>
+	</head>
+	<body>
+		<div id="stats">
+			 <p id="generation"></p>
+			 <p id="population"></p>
+			 <p id="mutation"></p>
+			 <p> Prędkość </p>
+			 <input  id="speed" type="range" min="1" max="100" value="50">
+			 <br>
+			 Progres generacji
+			 <progress id="genProgress" value="0" max="100"></progress> 
+			 <p id="avgFit"></p>
+			 
+		</div>
+	
+		<script>
+			var canvas = document.createElement("CANVAS");
+			var canvasWidth = 900;
+			var canvasHeight = 850;
+			canvas.setAttribute("width",canvasWidth);
+			canvas.setAttribute("height",canvasHeight);
+			document.body.appendChild(canvas);
+			var coords = [];
+			var sizeOfRect =10;
+			var Walls = [];
+			var maxDistance = Math.sqrt(Math.pow(canvasWidth,2) + Math.pow(canvasHeight,2));
+			drawGrid = function(ctx)
+			{
+				ctx.fillStyle = "#ffffff55";
+				for(var x=0;x<=canvasWidth;x+=sizeOfRect)
+				{
+					for(var y=0;y<=canvasHeight;y+=sizeOfRect)
+					{
+						ctx.fillRect(x,y,2,2);
+					
+					}	
+				}
+				
+				ctx.fillStyle = "#FF0000";
+				ctx.fillRect(0,0,sizeOfRect,sizeOfRect);
+				ctx.fillRect(destination[0],destination[1],sizeOfRect*2,sizeOfRect*2);
+			
+			}
+			
+			//ustawienia 
+			var maxPopulation = 150; 
+			var moveLimit =1200;
+			var mutationRate =3;
+			var speed = 101-parseInt(document.getElementById("speed").value);
+			var destination = [570,600];
+			
+			
+			var fitnessDivider =100;
+			var fitnessPower = 4;
+			var generationCount=0;
+			var bestScore = 0;
+			function randomDNA()
+			{
+				var DNA ="";
+				var letters ="UDLR";
+				for(var x=0;x<moveLimit;x++)
+				{
+					var random = Math.floor(Math.random()*4);
+					DNA+= letters[random];
+				}
+				
+				return DNA;
+			}
+			function randomLetter()
+			{
+				var letters ="UDLR";
+				var random = Math.floor(Math.random()*4);
+				return letters.charAt(random);
+			}
+			function randomColor()
+			{
+				var color = "#";
+				var letters = "ABCDEF0123456789";
+				for(var i =0;i<6;i++)
+				{
+					var random = Math.floor(Math.random()*16);
+					color += letters.charAt(random);
+				}
+				return color;
+			}
+			
+			var isMouseHoveringCanvas = false;
+			var firstPos=[];
+			var secondPos=[];
+			var tmpSecondPos = [];
+			canvas.onmouseenter = function()
+			{
+				isMouseHoveringCanvas = true;
+			}
+			canvas.onmouseleave = function()
+			{
+				isMouseHoveringCanvas = false;
+			}
+			canvas.onmousedown = function(event)
+			{
+				if(firstPos.length==0)
+				{
+					firstPos[0] = event.layerX;
+					firstPos[1] = event.layerY;
+				}
+				else if(firstPos.length==2 && secondPos.length==0)
+				{
+					secondPos[0] = event.layerX;
+					secondPos[1] = event.layerY;
+				}
+			}
+			canvas.onmousemove = function(event)
+			{
+				tmpSecondPos[0] = event.layerX;
+				tmpSecondPos[1] = event.layerY;
+			}
+			
+			
+			Wall = function(x,y,width,height)
+			{
+				this.x =x;
+				this.y =y;
+				this.width = width;
+				this.height = height;
+				this.draw = function(ctx)
+				{
+					ctx.fillStyle ="#FFFFFFAA";
+					ctx.fillRect(this.x,this.y,this.width,this.height);
+		
+				}
+				
+			}
+			//sciany  x,y,width,height
+			Walls[Walls.length] = new Wall(300,0,50,300);
+			Walls[Walls.length] = new Wall(300,300,200,50);
+			Walls[Walls.length] = new Wall(300,400,200,50);
+			Walls[Walls.length] = new Wall(300,450,50,400);
+			Walls[Walls.length] = new Wall(600,200,50,800);
+			Walls[Walls.length] = new Wall(600,0,50,150);
+			Walls[Walls.length] = new Wall(550,200,50,50);
+			Walls[Walls.length] = new Wall(750,100,50,550);
+			Walls[Walls.length] = new Wall(750,700,150,50);
+			Walls[Walls.length] = new Wall(800,400,150,50);
+			<!-- var tableOfWalls = JSON.parse('[{"x":60,"y":150,"width":30,"height":220},{"x":90,"y":150,"width":80,"height":30},{"x":170,"y":170,"width":20,"height":180},{"x":90,"y":340,"width":80,"height":30},{"x":210,"y":150,"width":30,"height":220},{"x":240,"y":150,"width":100,"height":30},{"x":320,"y":180,"width":30,"height":190},{"x":340,"y":150,"width":10,"height":30},{"x":240,"y":250,"width":80,"height":20},{"x":370,"y":150,"width":30,"height":220},{"x":400,"y":150,"width":20,"height":20},{"x":420,"y":170,"width":20,"height":20},{"x":440,"y":190,"width":20,"height":20},{"x":460,"y":190,"width":20,"height":20},{"x":480,"y":170,"width":20,"height":20},{"x":500,"y":150,"width":20,"height":20},{"x":520,"y":150,"width":30,"height":20},{"x":520,"y":170,"width":30,"height":200},{"x":580,"y":150,"width":30,"height":220},{"x":610,"y":150,"width":20,"height":20},{"x":630,"y":170,"width":20,"height":20},{"x":650,"y":190,"width":20,"height":20},{"x":670,"y":210,"width":20,"height":20},{"x":690,"y":230,"width":20,"height":20},{"x":710,"y":250,"width":20,"height":20},{"x":730,"y":270,"width":20,"height":20},{"x":750,"y":290,"width":20,"height":20},{"x":770,"y":310,"width":20,"height":20},{"x":790,"y":330,"width":20,"height":20},{"x":810,"y":350,"width":20,"height":20},{"x":810,"y":150,"width":20,"height":200},{"x":830,"y":150,"width":10,"height":220},{"x":110,"y":430,"width":30,"height":270},{"x":140,"y":430,"width":150,"height":30},{"x":140,"y":670,"width":150,"height":30},{"x":140,"y":550,"width":130,"height":30},{"x":320,"y":430,"width":30,"height":270},{"x":350,"y":430,"width":90,"height":30},{"x":440,"y":440,"width":20,"height":230},{"x":350,"y":670,"width":100,"height":30},{"x":620,"y":480,"width":30,"height":10},{"x":620,"y":450,"width":30,"height":30},{"x":580,"y":430,"width":40,"height":20},{"x":540,"y":430,"width":40,"height":20},{"x":510,"y":430,"width":30,"height":20},{"x":490,"y":450,"width":30,"height":230},{"x":520,"y":670,"width":110,"height":30},{"x":620,"y":650,"width":40,"height":20},{"x":620,"y":610,"width":40,"height":40},{"x":620,"y":580,"width":40,"height":30},{"x":570,"y":580,"width":50,"height":10},{"x":570,"y":590,"width":50,"height":10},{"x":680,"y":430,"width":30,"height":270},{"x":710,"y":670,"width":150,"height":30},{"x":710,"y":430,"width":150,"height":30},{"x":710,"y":550,"width":120,"height":40}]'); -->
+			<!-- for(var i in tableOfWalls) -->
+			<!-- { -->
+				<!-- var x=tableOfWalls[i].x; -->
+				<!-- var y=tableOfWalls[i].y; -->
+				<!-- var w=tableOfWalls[i].width; -->
+				<!-- var h=tableOfWalls[i].height; -->
+				<!-- Walls.push(new Wall(x,y,w,h)); -->
+			<!-- } -->
+			
+			
+			
+			
+			Member = function(DNA){
+				this.DNA = DNA;
+				this.currentStep =0;
+				this.x =0;
+				this.y =0;
+				this.color = randomColor();
+				this.fitness=0;
+				this.width = sizeOfRect;
+				this.height = sizeOfRect;
+				this.didCollide = false;
+				this.move = function(){
+					if(this.currentStep==moveLimit)
+					{
+						return;
+					} 
+					var direction = this.DNA[this.currentStep];
+					if(direction=="U")
+					{
+						this.y -=this.height;
+						if(this.collisionCheck())this.y +=this.height;
+					}
+					if(direction=="D")
+					{
+						this.y +=this.height;
+						if(this.collisionCheck())this.y -=this.height;
+					}
+					if(direction=="L")
+					{
+						this.x -=this.width;
+						if(this.collisionCheck())this.x +=this.width;
+					}
+					if(direction=="R")
+					{
+						this.x +=this.width;
+						if(this.collisionCheck())this.x -=this.width;
+					}
+					
+					if(this.didCollide) return;
+					
+					if(this.x==destination[0] && this.y == destination[1])this.currentStep = moveLimit;
+					else this.currentStep++;
+					this.fitness = Math.floor((maxDistance - Math.sqrt(Math.pow(this.x-destination[0],2) + Math.pow(this.y-destination[1],2)))/(fitnessDivider));
+					this.fitness = Math.pow(this.fitness,fitnessPower);
+				}
+				this.draw = function(ctx){
+					if(this.didCollide) return;
+					if(this.fitness>bestScore)
+					{
+						bestScore = this.fitness;
+					}
+					ctx.fillStyle = this.color;
+					ctx.fillRect(this.x,this.y,sizeOfRect,sizeOfRect);
+					
+				}
+				this.collisionCheck = function(){
+					for(var g in Walls)
+					{
+						var wall = Walls[g];
+						var wx = wall.x;
+						var wy = wall.y;
+						var ww = wall.width;
+						var wh = wall.height;
+						
+						if(this.x + this.width > wx && this.x < wx+ww && this.y + this.height > wy && this.y < wy+wh || this.x<0 || this.x+this.width>canvasWidth ||this.y<0 || this.y+this.height>canvasHeight)
+						{
+							//this.didCollide = true;   //czy sciany zabijają
+							return true;
+						}
+						else continue;
+					}
+					return false;
+				}
+				return null;
+			}
+			
+			var Members = [];
+			var kids = [];
+			for(var x=0;x<maxPopulation;x++)
+			{
+				Members[Members.length] = new Member(randomDNA());
+			}
+			var inter,inter2;
+			var matingPool =[];
+			var moves=0;
+			var averageFitness;
+			
+			
+			document.getElementById("speed").onchange = function(){
+				speed = 101-parseInt(document.getElementById("speed").value);
+				clearInterval(inter);
+				inter = setInterval(drawCanvas,speed);
+			}
+			
+			drawEditor = function(ctx)
+			{
+				if(firstPos.length==2 && secondPos.length==2)
+				{
+					var x1 = firstPos[0]- firstPos[0]%sizeOfRect;
+					var y1 = firstPos[1]- firstPos[1]%sizeOfRect;
+					var x2 = secondPos[0]- secondPos[0]%sizeOfRect;
+					var y2 = secondPos[1]- secondPos[1]%sizeOfRect;
+					var width,height;
+					var finalX,finalY;
+					if(x1 > x2)
+					{
+						width = x1-(x2-sizeOfRect);
+						finalX = x2;
+					}
+					else 
+					{
+						width = x2-(x1-sizeOfRect);
+						finalX = x1;
+					}
+					if(y1>y2)
+					{
+						height = y1-(y2-sizeOfRect);
+						finalY= y2;
+					}
+					else 
+					{
+						height = y2-(y1-sizeOfRect);
+						finalY = y1;
+					}
+					Walls[Walls.length] = new Wall(finalX,finalY,width,height);
+					firstPos = [];
+					secondPos = [];
+				}
+				else if(firstPos.length==2 && secondPos.length==0)
+				{
+					var x1 = firstPos[0]- firstPos[0]%sizeOfRect;
+					var y1 = firstPos[1]- firstPos[1]%sizeOfRect;
+					var x2 = tmpSecondPos[0]- tmpSecondPos[0]%sizeOfRect;
+					var y2 = tmpSecondPos[1]- tmpSecondPos[1]%sizeOfRect;
+					var width,height;
+					var finalX,finalY;
+					if(x1 > x2)
+					{
+						width = x1-(x2-sizeOfRect);
+						finalX = x2;
+					}
+					else 
+					{
+						width = x2-(x1-sizeOfRect);
+						finalX = x1;
+					}
+					if(y1>y2)
+					{
+						height = y1-(y2-sizeOfRect);
+						finalY= y2;
+					}
+					else 
+					{
+						height = y2-(y1-sizeOfRect);
+						finalY = y1;
+					}
+					ctx.fillStyle = "#ffffff38";
+					ctx.fillRect(finalX,finalY,width,height);
+				}
+			}
+			
+			
+			drawCanvas = function()
+			{
+				
+				
+				
+				var ctx = canvas.getContext("2d");
+				ctx.fillStyle = "#000000";
+				
+				
+				
+				
+				//wyswietl ustawienia i pobierz predkosc i pokaz progres
+				document.getElementById("generation").innerHTML ="Generacja: " + generationCount;
+				document.getElementById("population").innerHTML ="Rozmiar populacji: " + maxPopulation;
+				document.getElementById("genProgress").value = parseInt((moves/moveLimit)*100);
+				document.getElementById("mutation").innerHTML = "Szansa na mutację: "+mutationRate +"%";
+				
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				
+				
+				drawEditor(ctx);
+				
+				
+				drawGrid(ctx);
+				for(var i in Members)
+				{
+					Members[i].move();
+					Members[i].draw(ctx);
+				}
+				for(var g in Walls)
+				{
+					Walls[g].draw(ctx);
+				}
+					
+				
+				moves++;
+				if(moves==moveLimit)
+				{	
+					bestScore =0;
+					clearInterval(inter);
+				}
+				else 
+				{
+					return;
+				}
+				
+				matingPool=[];
+				for(var i =0;i<maxPopulation;i++)
+				{
+					for(var g=0;g<Members[i].fitness;g++)
+					{
+						matingPool[matingPool.length] = Members[i];
+					}
+				}
+				var sumOfFitness = matingPool.length;
+				var avgFitness = sumOfFitness/maxPopulation;
+				var perfectFitness = maxDistance/fitnessDivider;
+				var percentAvgFitness = parseInt((avgFitness/perfectFitness)*100);
+				//pokaz procentowy sredni fitness
+				//document.getElementById("avgFit").innerHTML = "Średni fitness: " + percentAvgFitness +"%";
+				
+				
+				for(var i in Members) delete Members[i];
+				Members = null;
+				for(var n in kids)  delete kids[n];
+				kids = null;
+				kids = [];
+				
+				for(var h=0;h<maxPopulation;h++)
+				{
+					var random1 = Math.floor(Math.random() * (matingPool.length-1));
+					var random2 = Math.floor(Math.random() * (matingPool.length-1));
+					var DNA1 = matingPool[random1].DNA;
+					var DNA2 = matingPool[random2].DNA;
+					var finalDNA ="";
+					//var middle = Math.floor(Math.random()*moveLimit-1);
+					var middle = parseInt(moveLimit/2);
+					for(var b=0;b<middle;b++)
+					{
+						var mutationRandom = Math.floor(Math.random() * (101));
+						if(mutationRandom <=mutationRate)finalDNA += randomLetter();
+						else finalDNA += DNA1.charAt(b);
+					}
+					for(var b=middle;b<moveLimit;b++)
+					{
+						var mutationRandom = Math.floor(Math.random() * (101));
+						if(mutationRandom <=mutationRate)finalDNA += randomLetter();
+						else finalDNA += DNA2.charAt(b);
+					}
+					kids[kids.length] = new Member(finalDNA);
+				}
+				Members = kids;
+				for(var h in matingPool)delete matingPool[h];
+				matingPool = null;
+				generationCount++;
+				
+				moves =0;
+				inter = setInterval(drawCanvas,speed);
+				
+				ctx = null;
+			}
+			
+			inter = setInterval(drawCanvas,speed);
+	
+			
+		</script>
+		
+	
+	
+	</body>
+<html>
